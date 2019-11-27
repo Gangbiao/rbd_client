@@ -2,4 +2,4 @@
 * mkdir build && cd build
 * cmake ../
 * make
-* ./rbd_clent -c /etc/ceph/ceph.conf
+* ./rbd_client -c /etc/ceph/ceph.conf
