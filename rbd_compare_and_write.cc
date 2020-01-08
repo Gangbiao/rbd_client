@@ -142,29 +142,32 @@ int main(int argc, const char **argv)
     } else {
       std::cout << "we just opened the rbd image" << std::endl;
     }
-
-    int TEST_IO_SIZE = 512;
-    char test_data[TEST_IO_SIZE + 1];
-    int i;
-
-    for (i = 0; i < TEST_IO_SIZE; ++i) {
-      test_data[i] = (char) (rand() % (126 - 33) + 33);
+  
+    size_t offset=128;
+    size_t len=256;   
+    char cmp_data[len];
+    uint64_t mismatch_off = 1;
+    int op_flags = 0;
+    
+    for (int i = 0; i < len; i++) {
+      cmp_data[i] = (char) (rand() % (126 - 33) + 33);
     }
-    test_data[TEST_IO_SIZE] = '\0';
     
-    //std::cout<< test_data << std::endl;
-    
-    size_t len = strlen(test_data);
+    ceph::bufferlist cmp_bl;
     ceph::bufferlist bl;
-    bl.append(test_data, len);
-
-    ret = image.write(0, len, bl);
+    cmp_bl.append(cmp_data, len);
+    
+    ret = image.write(offset, len, cmp_bl);
+    std::cout << "we just write our rbd image " << ret <<  std::endl;
+    
+    ret = image.compare_and_write(offset, len, cmp_bl, cmp_bl, &mismatch_off, op_flags);
     if (ret < 0) {
-      std::cerr << "couldn't write to the rbd image! error " << ret << std::endl;
-      ret = EXIT_FAILURE;
+      std::cerr << "couldn't compare and write to the rbd image! error " << ret << std::endl;
+      std::cerr << "couldn't compare and write to the rbd image! error " << mismatch_off << std::endl;
+      //ret = EXIT_FAILURE;
       goto out;
     } else {
-      std::cout << "we just wrote data to our rbd image " << std::endl;
+      std::cout << "we just compare and write to  our rbd image " << std::endl;
     }
 
     /*
