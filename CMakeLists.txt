@@ -13,3 +13,6 @@ target_link_libraries(rbd_client rados rbd)
 
 add_executable(rbd_compare_and_write rbd_compare_and_write.cc)
 target_link_libraries(rbd_compare_and_write rados rbd)
+
+add_executable(rbd_write_same rbd_write_same.cc)
+target_link_libraries(rbd_write_same rados rbd)
