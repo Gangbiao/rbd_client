@@ -21,7 +21,7 @@ int main(int argc, const char **argv)
   int ret = 0;
 
   // we will use all of these below
-  const char *pool_name = "hello_world_pool";
+  const char *pool_name = "xcopy_pool";
   std::string hello("hello world!");
   std::string object_name("hello_object");
   librados::IoCtx io_ctx;
@@ -119,48 +119,76 @@ int main(int argc, const char **argv)
    * create an rbd image and write data to it
    */
   {
-    std::string name = "librbd_test";
-    uint64_t size = 1 << 28;
+    std::string name1 = "librbd_test1";
+    std::string name2 = "librbd_test2";
+    uint64_t size = 1 << 27;
     int order = 0;
     librbd::RBD rbd;
-    librbd::Image image;
+    librbd::Image image1, image2; // to open librbd_test1 and librbd_test2
 
-    ret = rbd.create(io_ctx, name.c_str(), size, &order);
+    //create an open "librbd_test1"
+    ret = rbd.create(io_ctx, name1.c_str(), size, &order);
     if (ret < 0) {
-      std::cerr << "couldn't create an rbd image! error " << ret << std::endl;
+      std::cerr << "couldn't create librbd_test1! error " << ret << std::endl;
       ret = EXIT_FAILURE;
       goto out;
     } else {
-      std::cout << "we just created an rbd image" << std::endl;
+      std::cout << "we just created librbd_test1" << std::endl;
     }
 
-    ret = rbd.open(io_ctx, image, name.c_str(), NULL);
+    ret = rbd.open(io_ctx, image1, name1.c_str(), NULL);
     if (ret < 0) {
-      std::cerr << "couldn't open the rbd image! error " << ret << std::endl;
+      std::cerr << "couldn't open the librbd_test1! error " << ret << std::endl;
       ret = EXIT_FAILURE;
       goto out;
     } else {
-      std::cout << "we just opened the rbd image" << std::endl;
+      std::cout << "we just opened librbd_test1" << std::endl;
+    }
+    
+    //create an open "librbd_test2"
+    ret = rbd.create(io_ctx, name2.c_str(), size, &order);
+    if (ret < 0) {
+      std::cerr << "couldn't create librbd_test2! error " << ret << std::endl;
+      ret = EXIT_FAILURE;
+      goto out;
+    } else {
+      std::cout << "we just created librbd_test2" << std::endl;
+    }
+
+    ret = rbd.open(io_ctx, image2, name2.c_str(), NULL);
+    if (ret < 0) {
+      std::cerr << "couldn't open the librbd_test2! error " << ret << std::endl;
+      ret = EXIT_FAILURE;
+      goto out;
+    } else {
+      std::cout << "we just opened librbd_test2" << std::endl;
     }
   
+
     size_t offset=128;
-    size_t len=256;   
-    char zero_data[256]={0};
+    size_t len=256;
+    char zero_data[512]={0};
     uint64_t mismatch_off = 1;
     int op_flags = 0;
-    
+
     ceph::bufferlist zero_bl, bl;
-    zero_bl.append(zero_data, len);
+    zero_bl.append(zero_data, 512);
+
+    ret = image1.writesame(0, size, zero_bl, op_flags);
+    ret = image2.writesame(0, size, zero_bl, op_flags);
     
-    //ret = image.writesame(offset, len, cmp_bl, op_flags);
-    ret = image.writesame(0, size, zero_bl, op_flags);
+    //ceph::bufferlist cmp_bl;
+    //ceph::bufferlist bl;
+    //cmp_bl.append(cmp_data, len);
     
+    
+    ret = image1.xcopy(0, size, image2, 0, op_flags);
     if (ret < 0) {
-      std::cerr << "couldn't compare and write to the rbd image! error " << mismatch_off << std::endl;
+      std::cerr << "couldn't call xcopy! error " << mismatch_off << std::endl;
       //ret = EXIT_FAILURE;
       goto out;
     } else {
-      std::cout << "we just write_same to  our rbd image " << std::endl;
+      std::cout << "we just call xcopy " << std::endl;
     }
 
     /*
@@ -184,19 +212,21 @@ int main(int argc, const char **argv)
     //  std::cout << "we read our data on the image successfully" << std::endl;
     //}
 
-    image.close();
+    image1.close();
+    image2.close();
 
     /*
      *let's now delete the image
      */
-    /*ret = rbd.remove(io_ctx, name.c_str());
+    ret = rbd.remove(io_ctx, name1.c_str());
+    ret = rbd.remove(io_ctx, name2.c_str());
     if (ret < 0) {
       std::cerr << "failed to delete rbd image! error " << ret << std::endl;
       ret = EXIT_FAILURE;
       goto out;
     } else {
       std::cout << "we just deleted our rbd image " << std::endl;
-    }*/
+    }
   }
 
   ret = EXIT_SUCCESS;
@@ -205,12 +235,12 @@ int main(int argc, const char **argv)
    * And now we're done, so let's remove our pool and then
    * shut down the connection gracefully.
    */
-  /*int delete_ret = rados.pool_delete(pool_name);
+  int delete_ret = rados.pool_delete(pool_name);
   if (delete_ret < 0) {
     // be careful not to
     std::cerr << "We failed to delete our test pool!" << std::endl;
     ret = EXIT_FAILURE;
-  }*/
+  }
 
   rados.shutdown();
 

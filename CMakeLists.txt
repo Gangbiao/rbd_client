@@ -16,3 +16,6 @@ target_link_libraries(rbd_compare_and_write rados rbd)
 
 add_executable(rbd_write_same rbd_write_same.cc)
 target_link_libraries(rbd_write_same rados rbd)
+
+add_executable(rbd_xcopy rbd_xcopy.cc)
+target_link_libraries(rbd_xcopy rados rbd)
