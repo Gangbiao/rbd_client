@@ -1,18 +1,32 @@
+// -*- mode:C++; tab-width:8; c-basic-offset:2; indent-tabs-mode:t -*-
+// vim: ts=8 sw=2 smarttab
+/*
+ * Ceph - scalable distributed file system
+ *
+ * This is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License version 2.1, as published by the Free Software
+ * Foundation. See file COPYING.
+ */
+
+// install the librados-dev and librbd package to get this
 #include <rados/librados.hpp>
 #include <rbd/librbd.hpp>
 #include <iostream>
 #include <string>
 #include <sstream>
 
-/*
-  1. creaet xcopy_pool 
-  2. create librbd_test1, and write data
-*/
 
-void simple_xcopy_cb_pp(librbd::completion_t cb, void *arg)
-{
-  std::cout << "xcopy completion cb called!" << std::endl;
+
+//简单的回调函数，用于librbd::RBD::AioCompletion
+void simple_write_cb(librbd::completion_t cb, void *arg) {
+    std::cout << "write completion cb called!" << std::endl;
 }
+
+void simple_read_cb(librbd::completion_t cb, void *arg) {
+    std::cout << "read completion cb called!" << std::endl;
+}
+
 
 int main(int argc, const char **argv)
 {
@@ -84,6 +98,22 @@ int main(int argc, const char **argv)
   }
 
   /*
+   * let's create our own pool instead of scribbling over real data.
+   * Note that this command creates pools with default PG counts specified
+   * by the monitors, which may not be appropriate for real use -- it's fine
+   * for testing, though.
+   */
+  /*{
+    ret = rados.pool_create(pool_name);
+    if (ret < 0) {
+      std::cerr << "couldn't create pool! error " << ret << std::endl;
+      return EXIT_FAILURE;
+    } else {
+      std::cout << "we just created a new pool named " << pool_name << std::endl;
+    }
+  }*/
+
+  /*
    * create an "IoCtx" which is used to do IO to a pool
    */
   {
@@ -97,68 +127,56 @@ int main(int argc, const char **argv)
     }
   }
 
+  /*
+   * create an rbd image and write data to it
+   */
   {
-    std::string name1 = "test1";
-    std::string name2 = "test2";
-    uint64_t size = 1 << 29;
-    size *=10;
+    std::string name = "test";
+    uint64_t size = 1<<29;
+    //size *=4;
     int order = 0;
     librbd::RBD rbd;
-    librbd::Image image1, image2; // to open librbd_test1 and librbd_test2
+    librbd::Image image;
 
-    //create an open "librbd_test2"
-    /*ret = rbd.create(io_ctx, name2.c_str(), size, &order);
+    /*ret = rbd.create(io_ctx, name.c_str(), size, &order);
     if (ret < 0) {
-      std::cerr << "couldn't create librbd_test2! error " << ret << std::endl;
+      std::cerr << "couldn't create an rbd image! error " << ret << std::endl;
       ret = EXIT_FAILURE;
       goto out;
     } else {
-      std::cout << "we just created librbd_test2" << std::endl;
+      std::cout << "we just created an rbd image" << std::endl;
     }*/
 
-    ret = rbd.open(io_ctx, image2, name2.c_str(), NULL);
+    ret = rbd.open(io_ctx, image, name.c_str(), NULL);
     if (ret < 0) {
-      std::cerr << "couldn't open the librbd_test2! error " << ret << std::endl;
+      std::cerr << "couldn't open the rbd image! error " << ret << std::endl;
       ret = EXIT_FAILURE;
       goto out;
     } else {
-      std::cout << "we just opened librbd_test2" << std::endl;
+      std::cout << "we just opened the rbd image" << std::endl;
     }
-
-    ret = rbd.open(io_ctx, image1, name1.c_str(), NULL);
-    if (ret < 0) {
-      std::cerr << "couldn't open the librbd_test1! error " << ret << std::endl;
-      ret = EXIT_FAILURE;
-      goto out;
-    } else {
-      std::cout << "we just opened librbd_test1" << std::endl;
-    }
-
+  
     size_t offset=128;
-    size_t len=256;
-    char zero_data[512]={0};
+    size_t len=256;   
+    char zero_data[256]={0};
     uint64_t mismatch_off = 1;
     int op_flags = 0;
-
+    
     ceph::bufferlist zero_bl, bl;
-    zero_bl.append(zero_data, 512);
-
-
-
-    librbd::RBD::AioCompletion *comp = new librbd::RBD::AioCompletion(NULL, (librbd::callback_t) simple_xcopy_cb_pp);
-    printf("created completion\n"); 
-   
-    //C_SaferCond cond;
-    //AioCompletion *comp = AioCompletion::create(&cond);
- 
-    ret = image1.aio_xcopy(0, size, image1, size, comp, op_flags);
+    //zero_bl.append(zero_data, 1);
+    //zero_bl.append_zero(size);
+    librbd::RBD::AioCompletion *write_completion = new librbd::RBD::AioCompletion(
+        NULL, (librbd::callback_t) simple_write_cb); //读写AioCompletion
+     //ret = image.writesame(offset, len, cmp_bl, op_flags);
+    ret = image.aio_zero(0, size, write_completion, op_flags);
+    //ret = image.aio_discard(0, size, write_completion);
+    
     if (ret < 0) {
-      std::cerr << "couldn't call xcopy! error " << mismatch_off << std::endl;
-      std::cerr << "image1.xcopy return ret =  " << ret << std::endl;
+      std::cerr << "couldn't compare and write to the rbd image! error " << mismatch_off << std::endl;
       //ret = EXIT_FAILURE;
       goto out;
     } else {
-      std::cout << "we just call xcopy " << std::endl;
+      std::cout << "we just write_zero to  our rbd image " << std::endl;
     }
 
     /*
@@ -182,28 +200,35 @@ int main(int argc, const char **argv)
     //  std::cout << "we read our data on the image successfully" << std::endl;
     //}
 
-   /* image1.close();
-    image2.close();
+    image.close();
 
-    ret = rbd.remove(io_ctx, name1.c_str());
-    ret = rbd.remove(io_ctx, name2.c_str());*/
+    /*
+     *let's now delete the image
+     */
+    /*ret = rbd.remove(io_ctx, name.c_str());
     if (ret < 0) {
       std::cerr << "failed to delete rbd image! error " << ret << std::endl;
       ret = EXIT_FAILURE;
       goto out;
     } else {
       std::cout << "we just deleted our rbd image " << std::endl;
-    }
+    }*/
   }
 
   ret = EXIT_SUCCESS;
   out:
+  /*
+   * And now we're done, so let's remove our pool and then
+   * shut down the connection gracefully.
+   */
   /*int delete_ret = rados.pool_delete(pool_name);
   if (delete_ret < 0) {
     // be careful not to
     std::cerr << "We failed to delete our test pool!" << std::endl;
     ret = EXIT_FAILURE;
   }*/
+
   rados.shutdown();
+
   return ret;
 }

@@ -21,7 +21,7 @@ int main(int argc, const char **argv)
   int ret = 0;
 
   // we will use all of these below
-  const char *pool_name = "hello_world_pool";
+  const char *pool_name = "rbd";
   std::string hello("hello world!");
   std::string object_name("hello_object");
   librados::IoCtx io_ctx;
@@ -91,7 +91,7 @@ int main(int argc, const char **argv)
    * by the monitors, which may not be appropriate for real use -- it's fine
    * for testing, though.
    */
-  {
+  /*{
     ret = rados.pool_create(pool_name);
     if (ret < 0) {
       std::cerr << "couldn't create pool! error " << ret << std::endl;
@@ -99,7 +99,7 @@ int main(int argc, const char **argv)
     } else {
       std::cout << "we just created a new pool named " << pool_name << std::endl;
     }
-  }
+  }*/
 
   /*
    * create an "IoCtx" which is used to do IO to a pool
@@ -119,20 +119,22 @@ int main(int argc, const char **argv)
    * create an rbd image and write data to it
    */
   {
-    std::string name = "librbd_test";
-    uint64_t size = 1 << 28;
+    std::string name = "test";
+    uint64_t size = 1<<29;
+    size *=10;
+    std::cout << "size = " << size << std::endl;
     int order = 0;
     librbd::RBD rbd;
     librbd::Image image;
 
-    ret = rbd.create(io_ctx, name.c_str(), size, &order);
+    /*ret = rbd.create(io_ctx, name.c_str(), size, &order);
     if (ret < 0) {
       std::cerr << "couldn't create an rbd image! error " << ret << std::endl;
       ret = EXIT_FAILURE;
       goto out;
     } else {
       std::cout << "we just created an rbd image" << std::endl;
-    }
+    }*/
 
     ret = rbd.open(io_ctx, image, name.c_str(), NULL);
     if (ret < 0) {
@@ -150,10 +152,13 @@ int main(int argc, const char **argv)
     int op_flags = 0;
     
     ceph::bufferlist zero_bl, bl;
-    zero_bl.append(zero_data, len);
+    //zero_bl.append(zero_data, 1);
+    zero_bl.append_zero(size);
+    //zero_bl.zero(0, 512);
     
     //ret = image.writesame(offset, len, cmp_bl, op_flags);
-    ret = image.writesame(0, size, zero_bl, op_flags);
+    //ret = image.writesame(0, size, zero_bl, op_flags);
+    ret = image.write(0, size, zero_bl);
     
     if (ret < 0) {
       std::cerr << "couldn't compare and write to the rbd image! error " << mismatch_off << std::endl;
