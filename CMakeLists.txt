@@ -36,3 +36,6 @@ target_link_libraries(rbd_write rados rbd)
 
 add_executable(rbd_diff_iterate rbd_diff_iterate.cc)
 target_link_libraries(rbd_diff_iterate rados rbd)
+
+add_executable(rbd_aio_discard rbd_aio_discard.cc)
+target_link_libraries(rbd_aio_discard rados rbd)
