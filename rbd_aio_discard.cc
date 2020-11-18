@@ -167,17 +167,21 @@ int main(int argc, const char **argv)
     //zero_bl.append(zero_data, 1);
     //zero_bl.append_zero(size);
     librbd::RBD::AioCompletion *write_completion = new librbd::RBD::AioCompletion(
-        NULL, (librbd::callback_t) simple_write_cb); //读写AioCompletion
-     //ret = image.writesame(offset, len, cmp_bl, op_flags);
-    ret = image.aio_discard(0, size, write_completion);
+        NULL, (librbd::callback_t) simple_write_cb); //ioCompletion
+    //ret = image.aio_discard(0, 524288000, write_completion);// conf_rbd_qos_bps_limit is 600MB, discard 500MiB successfully
+    //ret = image.aio_discard(0, 10737418240, write_completion);// conf_rbd_qos_bps_limit is 600MB, discard 10GiB successfully
+    //ret = image.aio_discard(0, 107374182400, write_completion);// conf_rbd_qos_bps_limit is 600MB, discard 100GiB successfully
+    //ret = image.aio_discard(0, 1099511627776, write_completion);// conf_rbd_qos_bps_limit is 600MB, discard 1000GiB successfully
+    ret = image.aio_discard(atoi(argv[3]), atoi(argv[4]), write_completion);// conf_rbd_qos_bps_limit is 600MB, discard 1000GiB successfully
     //ret = image.aio_discard(0, size, write_completion);
-    
+    //std::cout<< argv[0]<< std::endl;
+    //std::cout<< argv[1]<< std::endl;
     if (ret < 0) {
-      std::cerr << "couldn't compare and write to the rbd image! error " << mismatch_off << std::endl;
+      std::cerr << "couldn't discard the rbd image! error " << mismatch_off << std::endl;
       //ret = EXIT_FAILURE;
       goto out;
     } else {
-      std::cout << "we just write_zero to  our rbd image " << std::endl;
+      std::cout << "we just discard our rbd image " << std::endl;
     }
 
     /*

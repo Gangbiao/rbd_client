@@ -131,8 +131,8 @@ int main(int argc, const char **argv)
    * create an rbd image and write data to it
    */
   {
-    std::string name = "test";
-    uint64_t size = 1<<29;
+    std::string name = "test1";
+    uint64_t size = 1073741824000; //1000GiB
     //size *=4;
     int order = 0;
     librbd::RBD rbd;
